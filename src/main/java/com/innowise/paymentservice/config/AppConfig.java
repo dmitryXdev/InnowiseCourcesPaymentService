@@ -1,5 +1,6 @@
 package com.innowise.paymentservice.config;
 
+import io.mongock.runner.springboot.EnableMongock;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -11,5 +12,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableMongoAuditing
 @EnableAsync
 @EnableKafka
+@EnableMongock
 public class AppConfig {
 }

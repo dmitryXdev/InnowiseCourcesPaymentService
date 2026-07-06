@@ -14,7 +14,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 public class InitCollectionChangeUnit {
     @Execution
     public void execution(MongoTemplate mongoTemplate) {
-        if(mongoTemplate.collectionExists(Payment.class)) {
+        if(!mongoTemplate.collectionExists(Payment.class)) {
             mongoTemplate.createCollection(Payment.class);
         }
     }

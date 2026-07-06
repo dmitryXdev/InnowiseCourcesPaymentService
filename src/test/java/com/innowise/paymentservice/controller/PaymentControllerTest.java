@@ -1,6 +1,7 @@
 package com.innowise.paymentservice.controller;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.innowise.paymentservice.config.TestConfig;
 import com.innowise.paymentservice.dao.PaymentRepository;
@@ -11,8 +12,10 @@ import com.innowise.paymentservice.dto.TokenValidationResponseDto;
 import com.innowise.paymentservice.mapper.PaymentMapper;
 import com.innowise.paymentservice.model.Payment;
 import com.innowise.paymentservice.model.PaymentStatus;
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.internal.matchers.Null;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -33,6 +36,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.serverError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -80,6 +84,22 @@ class PaymentControllerTest {
 
         authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth/validate"))
                 .willReturn(okJson(objectMapper.writeValueAsString(response))));
+    }
+
+    private void errorAuth(boolean throwException, ResponseDefinitionBuilder builder) {
+        if(throwException) {
+            authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth/validate"))
+                    .willReturn(builder));
+        } else {
+            TokenValidationResponseDto response = TokenValidationResponseDto.builder()
+                    .valid(false)
+                    .role(null)
+                    .userId(null)
+                    .build();
+
+            authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth/validate"))
+                    .willReturn(okJson(objectMapper.writeValueAsString(response))));
+        }
     }
 
     private void fillDbWithPayments(int amount, Long userId, String status) {
@@ -151,6 +171,15 @@ class PaymentControllerTest {
         mockMvc.perform(get("/payments/" + payment.getId())
                         .header(HttpHeaders.AUTHORIZATION, TOKEN))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getPaymentById_shouldThrowExceptionOnNotFoundResource() throws Exception {
+        authenticateAs("USER");
+
+        mockMvc.perform(get("/payments/not-exists")
+                        .header(HttpHeaders.AUTHORIZATION, TOKEN))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -245,6 +274,48 @@ class PaymentControllerTest {
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
 
         assertEquals(expectedTotal, total);
+    }
+
+    @Test
+    void getSummary_shouldThrowExceptionOnBadIncomingData() throws Exception {
+        authenticateAs("USER");
+
+        mockMvc.perform(get("/payments/users/0/summary")
+                        .header(HttpHeaders.AUTHORIZATION, TOKEN)
+                        .param("from", "")
+                        .param("to", LocalDate.now().toString()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getSummary_shouldThrowExceptionOnAuthServiceFall() throws Exception {
+        errorAuth(true, serverError());
+
+        mockMvc.perform(get("/payments/users/0/summary")
+                        .header(HttpHeaders.AUTHORIZATION, TOKEN)
+                        .param("from", "")
+                        .param("to", LocalDate.now().toString()))
+                .andExpect(status().isInternalServerError());
+    }
+
+    @Test
+    void getSummary_shouldThrowExceptionOnAuthServiceUnavailable() throws Exception {
+        errorAuth(true, WireMock.serviceUnavailable());
+
+        mockMvc.perform(get("/payments/users/0/summary")
+                        .header(HttpHeaders.AUTHORIZATION, TOKEN)
+                        .param("from", "")
+                        .param("to", LocalDate.now().toString()))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void getSummary_shouldThrowExceptionOnMissingArgument() throws Exception {
+        authenticateAs("USER");
+
+        mockMvc.perform(get("/payments/users/0/summary")
+                        .header(HttpHeaders.AUTHORIZATION, TOKEN))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
