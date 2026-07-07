@@ -49,6 +49,8 @@ services:
         KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     volumes:
       - kafka_data:/var/lib/kafka/data
+    networks:
+      - java-network
 
 volumes:
   mongodb_data:

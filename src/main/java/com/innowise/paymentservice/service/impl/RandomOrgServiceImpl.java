@@ -5,14 +5,14 @@ import com.innowise.paymentservice.dto.randomorg.RequestDto;
 import com.innowise.paymentservice.dto.randomorg.RequestParamsDto;
 import com.innowise.paymentservice.service.RandomOrgService;
 import lombok.RequiredArgsConstructor;
-import com.innowise.paymentservice.feign.RandomNumberServiceClient;
+import com.innowise.paymentservice.feign.RandomOrgServiceClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class RandomOrgServiceImpl implements RandomOrgService {
-    private final RandomNumberServiceClient randomNumberServiceClient;
+    private final RandomOrgServiceClient randomOrgServiceClient;
 
     @Value("${service.random.number.min}")
     private Long min;
@@ -44,7 +44,7 @@ public class RandomOrgServiceImpl implements RandomOrgService {
 
         requestDto.setParams(params);
 
-        AnswerDto answer = randomNumberServiceClient.getRandomNumber(requestDto);
+        AnswerDto answer = randomOrgServiceClient.getRandomNumber(requestDto);
 
         return answer.getResult().getRandom().getData().getFirst() % 2 == 0;
     }

@@ -8,7 +8,7 @@ import com.innowise.paymentservice.dto.randomorg.AnswerResultDto;
 import com.innowise.paymentservice.dto.randomorg.AnswerResultRandomDto;
 import com.innowise.paymentservice.exception.AccessDeniedException;
 import com.innowise.paymentservice.exception.BadIncomingDataException;
-import com.innowise.paymentservice.feign.RandomNumberServiceClient;
+import com.innowise.paymentservice.feign.RandomOrgServiceClient;
 import com.innowise.paymentservice.kafka.producer.PaymentProducer;
 import com.innowise.paymentservice.mapper.PaymentMapper;
 import com.innowise.paymentservice.model.Payment;
@@ -56,7 +56,7 @@ class PaymentServiceTest {
     private MongoTemplate mongoTemplate;
 
     @Mock
-    private RandomNumberServiceClient randomNumberServiceClient;
+    private RandomOrgServiceClient randomOrgServiceClient;
 
     @Mock
     private PaymentProducer paymentProducer;
@@ -107,7 +107,7 @@ class PaymentServiceTest {
 
         when(paymentRepository.save(any())).thenReturn(payment);
         when(paymentRepository.findById(any())).thenReturn(Optional.of(payment));
-        when(randomNumberServiceClient.getRandomNumber(any())).thenReturn(generateRandomOrgAnswer());
+        when(randomOrgServiceClient.getRandomNumber(any())).thenReturn(generateRandomOrgAnswer());
 
         CreatePaymentDto createPaymentDto = new CreatePaymentDto();
         createPaymentDto.setPaymentAmount(new BigDecimal(111));

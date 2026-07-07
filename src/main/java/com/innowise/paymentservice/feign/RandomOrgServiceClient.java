@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 @FeignClient(name = "random-number-service",
         url = "${service.random.url}",
         fallbackFactory = RandomNumberServiceClientFallbackFactory.class)
-public interface RandomNumberServiceClient {
+public interface RandomOrgServiceClient {
     @PostMapping
     AnswerDto getRandomNumber(@RequestBody @Valid RequestDto requestDto);
 }
