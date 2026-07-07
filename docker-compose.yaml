@@ -3,10 +3,10 @@ services:
     build: .
     container_name: payment-service-container
     ports:
-      - "8084:8084"
+      - "8083:8083"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_MONGODB_HOST=mongodb://admin:password@mongodb:27017/payment_db?authService=admin
+      - SPRING_MONGODB_HOST=mongodb://admin:password@mongodb:27017/payment_db?authSource=admin
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - SERVICES_AUTH_URL=http://auth-service:8080
     depends_on:
@@ -14,7 +14,7 @@ services:
     networks:
       - java-network
 
-  mongodb:
+  payment-mongodb:
     image: mongo:7.0
     container_name: payment-service-mongodb
     ports:
