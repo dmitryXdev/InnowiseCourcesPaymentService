@@ -49,9 +49,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @Import(TestConfig.class)
 @AutoConfigureMockMvc
-@EnableWireMock({
+@EnableWireMock(
         @ConfigureWireMock(name = "auth-service", port = 8081)
-})
+)
 class PaymentControllerTest {
     @InjectWireMock("auth-service")
     private WireMockServer authService;
@@ -68,7 +68,7 @@ class PaymentControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private final static String TOKEN = "Bearer token";
+    private final String TOKEN = "Bearer token";
 
     @AfterEach
     void clearDb() {

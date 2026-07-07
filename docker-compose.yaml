@@ -1,5 +1,5 @@
 services:
-  order-service:
+  payment-service:
     build: .
     container_name: payment-service-container
     ports:
