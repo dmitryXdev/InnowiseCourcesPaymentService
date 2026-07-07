@@ -146,6 +146,27 @@ class PaymentControllerTest {
     }
 
     @Test
+    void createPayment_shouldThrowExceptionOnNotBearerToken() throws Exception {
+        mockMvc.perform(post("/payments")
+                .header(HttpHeaders.AUTHORIZATION, "token")
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content(""))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createPayment_shouldThrowExceptionOnAuthServiceNotValidToken() throws Exception {
+        errorAuth(false, null);
+
+        mockMvc.perform(post("/payments")
+                        .header(HttpHeaders.AUTHORIZATION, TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON_VALUE)
+                        .content(""))
+                .andExpect(status().isForbidden())
+                .andReturn().getResponse();
+    }
+
+    @Test
     void getPaymentById_shouldReturnPaymentById() throws Exception {
         authenticateAs("ADMIN");
         fillDbWithPayments(15, null, null);
@@ -283,6 +304,17 @@ class PaymentControllerTest {
         mockMvc.perform(get("/payments/users/0/summary")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("from", "")
+                        .param("to", LocalDate.now().toString()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getSummary_shouldThrowExceptionOnArgumentTypeMismatch() throws Exception {
+        authenticateAs("USER");
+
+        mockMvc.perform(get("/payments/users/0/summary")
+                        .header(HttpHeaders.AUTHORIZATION, TOKEN)
+                        .param("from", "null")
                         .param("to", LocalDate.now().toString()))
                 .andExpect(status().isBadRequest());
     }

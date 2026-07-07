@@ -5,6 +5,7 @@ import com.innowise.paymentservice.exception.BadIncomingDataException;
 import com.innowise.paymentservice.exception.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -22,6 +23,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadIncomingDataException.class)
     public ResponseEntity<ErrorResponse> badIncomeDataException(BadIncomingDataException e) {
+        System.out.println("BadIncomingDataException");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ErrorResponse.builder()
                         .status(HttpStatus.BAD_REQUEST.value())
@@ -49,6 +51,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> missingServletRequestParameterException(MissingServletRequestParameterException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST.value())
+                .body(
+                        ErrorResponse.builder()
+                                .message(e.getMessage())
+                                .status(HttpStatus.BAD_REQUEST.value())
+                                .build()
+                );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> methodArgumentNotValidException(MethodArgumentTypeMismatchException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST.value())
                 .body(
                         ErrorResponse.builder()
