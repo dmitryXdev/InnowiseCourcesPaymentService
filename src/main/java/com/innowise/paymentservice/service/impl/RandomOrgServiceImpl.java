@@ -14,19 +14,24 @@ import org.springframework.stereotype.Service;
 public class RandomOrgServiceImpl implements RandomOrgService {
     private final RandomOrgServiceClient randomOrgServiceClient;
 
-    @Value("${service.random.number.min}")
+    @Value("${services.random.number.min}")
     private Long min;
-    @Value("${service.random.number.max}")
+    @Value("${services.random.number.max}")
     private Long max;
-    @Value("${service.random.api.key}")
+    @Value("${services.random.api.key}")
     private String apiKey;
-    @Value("${service.random.number.base}")
+    @Value("${services.random.number.base}")
     private Integer base;
-    @Value("${service.random.api.method}")
+    @Value("${services.random.api.method}")
     private String method;
-    @Value("${service.random.number.amount}")
+    @Value("${services.random.number.amount}")
     private Integer amount;
 
+    /**
+     * Imitates payment by sending request to random.org
+     * @return boolean
+     */
+    @Override
     public boolean tryToPay() {
         RequestDto requestDto = new RequestDto();
         requestDto.setId(0L);

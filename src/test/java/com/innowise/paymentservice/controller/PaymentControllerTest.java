@@ -9,22 +9,27 @@ import com.innowise.paymentservice.dto.CreatePaymentDto;
 import com.innowise.paymentservice.dto.PageResponse;
 import com.innowise.paymentservice.dto.PaymentDto;
 import com.innowise.paymentservice.dto.TokenValidationResponseDto;
+import com.innowise.paymentservice.kafka.event.PaymentEvent;
 import com.innowise.paymentservice.mapper.PaymentMapper;
 import com.innowise.paymentservice.model.Payment;
 import com.innowise.paymentservice.model.PaymentStatus;
-import lombok.SneakyThrows;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.internal.matchers.Null;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.wiremock.spring.ConfigureWireMock;
 import org.wiremock.spring.EnableWireMock;
 import org.wiremock.spring.InjectWireMock;
@@ -32,8 +37,10 @@ import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.serverError;
@@ -63,6 +70,9 @@ class PaymentControllerTest {
     private PaymentRepository paymentRepository;
 
     @Autowired
+    private DefaultKafkaConsumerFactory<String, PaymentEvent> defaultKafkaConsumerFactory;
+
+    @Autowired
     private PaymentMapper paymentMapper;
 
     @Autowired
@@ -82,13 +92,13 @@ class PaymentControllerTest {
                 .userId(0L)
                 .build();
 
-        authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth/validate"))
+        authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth-service/auth/validate"))
                 .willReturn(okJson(objectMapper.writeValueAsString(response))));
     }
 
     private void errorAuth(boolean throwException, ResponseDefinitionBuilder builder) {
         if(throwException) {
-            authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth/validate"))
+            authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth-service/auth/validate"))
                     .willReturn(builder));
         } else {
             TokenValidationResponseDto response = TokenValidationResponseDto.builder()
@@ -97,7 +107,7 @@ class PaymentControllerTest {
                     .userId(null)
                     .build();
 
-            authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth/validate"))
+            authService.stubFor(WireMock.post(WireMock.urlEqualTo("/auth-service/auth/validate"))
                     .willReturn(okJson(objectMapper.writeValueAsString(response))));
         }
     }
@@ -135,19 +145,30 @@ class PaymentControllerTest {
         dto.setPaymentAmount(new BigDecimal(111));
         dto.setOrderId(0L);
 
-        PaymentDto paymentDto = objectMapper.readValue(mockMvc.perform(post("/payments")
-                .header(HttpHeaders.AUTHORIZATION, TOKEN)
-                .contentType(MediaType.APPLICATION_JSON_VALUE)
-                .content(objectMapper.writeValueAsString(dto)))
+        PaymentDto paymentDto = objectMapper.readValue(mockMvc.perform(post("/payment-service/payments")
+                        .header(HttpHeaders.AUTHORIZATION, TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString(), PaymentDto.class);
 
         assertNotNull(paymentDto);
         assertEquals(PaymentStatus.PENDING.name(), paymentDto.getStatus());
+
+        try(Consumer<String, PaymentEvent> consumer = defaultKafkaConsumerFactory.createConsumer()) {
+            consumer.subscribe(Collections.singletonList("payment-events"));
+
+            ConsumerRecord<String, PaymentEvent> record =
+                    KafkaTestUtils.getSingleRecord(consumer, "payment-events", Duration.ofSeconds(10));
+
+            PaymentEvent event = record.value();
+            assertNotNull(event);
+            assertEquals(event.getOrderId(), paymentDto.getOrderId());
+        }
     }
 
     @Test
     void createPayment_shouldThrowExceptionOnNotBearerToken() throws Exception {
-        mockMvc.perform(post("/payments")
+        mockMvc.perform(post("/payment-service/payments")
                 .header(HttpHeaders.AUTHORIZATION, "token")
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content(""))
@@ -158,7 +179,7 @@ class PaymentControllerTest {
     void createPayment_shouldThrowExceptionOnAuthServiceNotValidToken() throws Exception {
         errorAuth(false, null);
 
-        mockMvc.perform(post("/payments")
+        mockMvc.perform(post("/payment-service/payments")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .contentType(MediaType.APPLICATION_JSON_VALUE)
                         .content(""))
@@ -173,7 +194,8 @@ class PaymentControllerTest {
 
         Payment payment = paymentRepository.findAll().get(0);
 
-        PaymentDto paymentDto = objectMapper.readValue(mockMvc.perform(get("/payments/" + payment.getId())
+        PaymentDto paymentDto = objectMapper
+                .readValue(mockMvc.perform(get("/payment-service/payments/" + payment.getId())
                 .header(HttpHeaders.AUTHORIZATION, TOKEN))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(), PaymentDto.class);
@@ -189,7 +211,7 @@ class PaymentControllerTest {
 
         Payment payment = paymentRepository.findAll().get(2);
 
-        mockMvc.perform(get("/payments/" + payment.getId())
+        mockMvc.perform(get("/payment-service/payments/" + payment.getId())
                         .header(HttpHeaders.AUTHORIZATION, TOKEN))
                 .andExpect(status().isForbidden());
     }
@@ -198,7 +220,7 @@ class PaymentControllerTest {
     void getPaymentById_shouldThrowExceptionOnNotFoundResource() throws Exception {
         authenticateAs("USER");
 
-        mockMvc.perform(get("/payments/not-exists")
+        mockMvc.perform(get("/payment-service/payments/not-exists")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN))
                 .andExpect(status().isBadRequest());
     }
@@ -210,7 +232,7 @@ class PaymentControllerTest {
 
         JavaType javaType = objectMapper.getTypeFactory().constructParametricType(PageResponse.class, PaymentDto.class);
 
-        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payments")
+        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payment-service/payments")
                 .header(HttpHeaders.AUTHORIZATION, TOKEN))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(), javaType);
@@ -233,7 +255,7 @@ class PaymentControllerTest {
 
         JavaType javaType = objectMapper.getTypeFactory().constructParametricType(PageResponse.class, PaymentDto.class);
 
-        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payments")
+        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payment-service/payments")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("userId", "0")
                         .param("orderId", "1")
@@ -260,7 +282,7 @@ class PaymentControllerTest {
 
         JavaType javaType = objectMapper.getTypeFactory().constructParametricType(PageResponse.class, PaymentDto.class);
 
-        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payments")
+        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payment-service/payments")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(), javaType);
@@ -277,14 +299,14 @@ class PaymentControllerTest {
 
         JavaType javaType = objectMapper.getTypeFactory().constructParametricType(PageResponse.class, PaymentDto.class);
 
-        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payments")
+        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payment-service/payments")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("from", LocalDate.now().minusDays(10L).toString())
                         .param("to", LocalDate.now().toString()))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(), javaType);
 
-        BigDecimal total = objectMapper.readValue(mockMvc.perform(get("/payments/users/0/summary")
+        BigDecimal total = objectMapper.readValue(mockMvc.perform(get("/payment-service/payments/users/0/summary")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("from", LocalDate.now().minusDays(10L).toString())
                         .param("to", LocalDate.now().toString()))
@@ -301,7 +323,7 @@ class PaymentControllerTest {
     void getSummary_shouldThrowExceptionOnBadIncomingData() throws Exception {
         authenticateAs("USER");
 
-        mockMvc.perform(get("/payments/users/0/summary")
+        mockMvc.perform(get("/payment-service/payments/users/0/summary")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("from", "")
                         .param("to", LocalDate.now().toString()))
@@ -312,7 +334,7 @@ class PaymentControllerTest {
     void getSummary_shouldThrowExceptionOnArgumentTypeMismatch() throws Exception {
         authenticateAs("USER");
 
-        mockMvc.perform(get("/payments/users/0/summary")
+        mockMvc.perform(get("/payment-service/payments/users/0/summary")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("from", "null")
                         .param("to", LocalDate.now().toString()))
@@ -323,7 +345,7 @@ class PaymentControllerTest {
     void getSummary_shouldThrowExceptionOnAuthServiceFall() throws Exception {
         errorAuth(true, serverError());
 
-        mockMvc.perform(get("/payments/users/0/summary")
+        mockMvc.perform(get("/payment-service/payments/users/0/summary")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("from", "")
                         .param("to", LocalDate.now().toString()))
@@ -334,7 +356,7 @@ class PaymentControllerTest {
     void getSummary_shouldThrowExceptionOnAuthServiceUnavailable() throws Exception {
         errorAuth(true, WireMock.serviceUnavailable());
 
-        mockMvc.perform(get("/payments/users/0/summary")
+        mockMvc.perform(get("/payment-service/payments/users/0/summary")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("from", "")
                         .param("to", LocalDate.now().toString()))
@@ -345,7 +367,7 @@ class PaymentControllerTest {
     void getSummary_shouldThrowExceptionOnMissingArgument() throws Exception {
         authenticateAs("USER");
 
-        mockMvc.perform(get("/payments/users/0/summary")
+        mockMvc.perform(get("/payment-service/payments/users/0/summary")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN))
                 .andExpect(status().isBadRequest());
     }
@@ -357,7 +379,7 @@ class PaymentControllerTest {
 
         JavaType javaType = objectMapper.getTypeFactory().constructParametricType(PageResponse.class, PaymentDto.class);
 
-        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payments")
+        PageResponse<PaymentDto> page = objectMapper.readValue(mockMvc.perform(get("/payment-service/payments")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                                 .param("size", "15")
                         .param("from", LocalDate.now().minusDays(10L).toString())
@@ -365,7 +387,7 @@ class PaymentControllerTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(), javaType);
 
-        BigDecimal total = objectMapper.readValue(mockMvc.perform(get("/payments/summary")
+        BigDecimal total = objectMapper.readValue(mockMvc.perform(get("/payment-service/payments/summary")
                         .header(HttpHeaders.AUTHORIZATION, TOKEN)
                         .param("from", LocalDate.now().minusDays(10L).toString())
                         .param("to", LocalDate.now().toString()))

@@ -10,10 +10,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 @FeignClient(name = "auth-service",
-        url = "${service.auth.url}",
+        url = "${services.auth.url}",
         configuration = FeignConfiguration.class,
         fallbackFactory = AuthServiceClientFallbackFactory.class)
 public interface AuthServiceClient {
-    @PostMapping("/auth/validate")
+    @PostMapping("/auth-service/auth/validate")
     TokenValidationResponseDto validate(@RequestBody @Valid TokenValidationRequestDto dto);
 }

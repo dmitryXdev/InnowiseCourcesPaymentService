@@ -4,6 +4,7 @@ import com.innowise.paymentservice.dto.CreatePaymentDto;
 import com.innowise.paymentservice.dto.PaymentDto;
 import com.innowise.paymentservice.security.UserPrincipal;
 import com.innowise.paymentservice.service.PaymentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -22,23 +23,48 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/payments")
+@RequestMapping("/payment-service/payments")
 @RequiredArgsConstructor
 public class PaymentController {
     private final PaymentService paymentService;
 
+    /**
+     * Creates and returns new payment.
+     * @param dto
+     * @param principal
+     * @return ResponseEntity<PaymentDto>
+     */
     @PostMapping
-    public ResponseEntity<PaymentDto> createPayment(@RequestBody CreatePaymentDto dto,
+    public ResponseEntity<PaymentDto> createPayment(@RequestBody @Valid CreatePaymentDto dto,
                                                     @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(paymentService.createPayment(dto, principal));
     }
 
+    /**
+     * Returns existing payment by its id
+     * @param id
+     * @param principal
+     * @return ResponseEntity<PaymentDto>
+     */
     @GetMapping("/{id}")
     public ResponseEntity<PaymentDto> getPaymentById(@PathVariable String id,
                                                      @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(paymentService.getPaymentById(id, principal));
     }
 
+    /**
+     * Return all operations by filter
+     * @param userId
+     * @param orderId
+     * @param status
+     * @param principal
+     * @param from
+     * @param to
+     * @param page
+     * @param size
+     * @param sortBy
+     * @return ResponseEntity<Page<PaymentDto>>
+     */
     @GetMapping
     public ResponseEntity<Page<PaymentDto>> getAllByFilter(@RequestParam(value = "userId", required = false) Long userId,
                                                            @RequestParam(value = "orderId", required = false) Long orderId,
@@ -53,6 +79,13 @@ public class PaymentController {
                 .findAllByFields(userId, orderId, from, to, status, principal, page, size, sortBy));
     }
 
+    /**
+     * Returns summary of all user's operations.
+     * @param userId
+     * @param from
+     * @param to
+     * @return ResponseEntity<BigDecimal>
+     */
     @GetMapping("/users/{user_id}/summary")
     @PreAuthorize("hasRole('ADMIN') || authentication.principal.id == #userId")
     public ResponseEntity<BigDecimal> getUserSummary(@PathVariable("user_id") Long userId,
@@ -61,6 +94,12 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.getSummary(userId, from, to));
     }
 
+    /**
+     * Return summary of all operations of all users.
+     * @param from
+     * @param to
+     * @return
+     */
     @GetMapping("/summary")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BigDecimal> getGeneralSummary(@RequestParam("from") LocalDate from,

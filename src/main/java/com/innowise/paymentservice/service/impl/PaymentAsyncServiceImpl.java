@@ -7,19 +7,25 @@ import com.innowise.paymentservice.kafka.producer.PaymentProducer;
 import com.innowise.paymentservice.model.Payment;
 import com.innowise.paymentservice.model.PaymentStatus;
 import com.innowise.paymentservice.service.PaymentAsyncService;
+import com.innowise.paymentservice.service.RandomOrgService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class PaymentAsyncServiceImpl implements PaymentAsyncService {
     private final PaymentRepository paymentRepository;
     private final PaymentProducer paymentProducer;
-    private final RandomOrgServiceImpl randomOrgService;
+    private final RandomOrgService randomOrgService;
 
     private static final String ENTITY_NOT_FOUND_MESSAGE = "Entity not found";
 
+    /**
+     * Processes payment.
+     * @param id
+     */
     @Async
     public void processPaymentAsync(String id) {
         Payment payment = paymentRepository.findById(id)

@@ -1,4 +1,4 @@
-name: OrderService CI pipeline
+name: PaymentService CI pipeline
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
 
-  build-test-analyze:
+  build-test-analyze-docker:
 
     runs-on: ubuntu-latest
 

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 @FeignClient(name = "random-number-service",
-        url = "${service.random.url}",
+        url = "${services.random.url}",
         fallbackFactory = RandomNumberServiceClientFallbackFactory.class)
 public interface RandomOrgServiceClient {
     @PostMapping

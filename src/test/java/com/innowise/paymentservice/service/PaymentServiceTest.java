@@ -75,7 +75,7 @@ class PaymentServiceTest {
         paymentAsyncService = new PaymentAsyncServiceImpl(paymentRepository, paymentProducer, randomOrgService);
 
         paymentService =
-                new PaymentServiceImpl(paymentRepository, mongoTemplate, paymentMapper, randomOrgService, paymentProducer, paymentAsyncService);
+                new PaymentServiceImpl(paymentRepository, mongoTemplate, paymentMapper, paymentAsyncService);
     }
 
     private Payment generatePayment(Long userId, BigDecimal amount) {

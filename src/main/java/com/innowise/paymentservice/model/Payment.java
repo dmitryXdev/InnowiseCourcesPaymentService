@@ -28,6 +28,6 @@ public class Payment {
     @Field(name = "payment_amount")
     private BigDecimal paymentAmount;
 
-    @Field(name = "payment_status")
+    @Field(name = "status")
     private PaymentStatus status;
 }
